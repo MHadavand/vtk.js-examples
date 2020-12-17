@@ -1,8 +1,17 @@
 const path = require('path');
+const webpack = require('webpack')
 
 const vtkRules = require('vtk.js/Utilities/config/dependency.js').webpack.core.rules;
 
-const example = process.env['EXAMPLE'].replace(/[\/]|\.\./g, '') || 'cone.js';
+var example
+try {
+  example = process.env['EXAMPLE'].replace(/[\/]|\.\./g, '') || 'cone.js';
+  console.log(`Using ${example}!`);
+}
+catch (error) {
+  console.log("Using the generic index.js files")
+  example = 'index.js'
+}
 
 module.exports = {
   entry: {
@@ -26,13 +35,11 @@ module.exports = {
   },
   devServer: {
     contentBase: path.join(__dirname, 'dist'),
-    disableHostCheck: true,
-    hot: false,
-    quiet: false,
-    noInfo: false,
-    stats: {
-      colors: true,
-    },
+    compress: true,
+    port: 9000,
+    watchOptions: {
+      poll: true
+    }
   },
 };
 

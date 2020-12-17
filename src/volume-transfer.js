@@ -1,11 +1,9 @@
 import vtkGenericRenderWindow from 'vtk.js/Sources/Rendering/Misc/GenericRenderWindow';
-
 import vtkVolume from 'vtk.js/Sources/Rendering/Core/Volume';
 import vtkVolumeMapper from 'vtk.js/Sources/Rendering/Core/VolumeMapper';
 import vtkHttpDataSetReader from 'vtk.js/Sources/IO/Core/HttpDataSetReader';
 import vtkColorTransferFunction from 'vtk.js/Sources/Rendering/Core/ColorTransferFunction';
 import vtkPiecewiseFunction from 'vtk.js/Sources/Common/DataModel/PiecewiseFunction';
-
 import vtkColorMaps from 'vtk.js/Sources/Rendering/Core/ColorTransferFunction/ColorMaps';
 
 
@@ -37,7 +35,7 @@ const lookupTable = vtkColorTransferFunction.newInstance();
 const piecewiseFun = vtkPiecewiseFunction.newInstance();
 
 // set up color transfer function
-lookupTable.applyColorMap(vtkColorMaps.getPresetByName('Cool to Warm'));
+lookupTable.applyColorMap(vtkColorMaps.getPresetByName('Viridis (matplotlib)'));
 // hardcode an initial mapping range here.
 // Normally you would instead use the range from
 // imageData.getPointData().getScalars().getRange()
