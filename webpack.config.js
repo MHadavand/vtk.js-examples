@@ -23,11 +23,11 @@ module.exports = {
   },
   module: {
     rules: [
-      {
-        test: /\.js$/,
-        loader: 'babel-loader',
-        exclude: /node_modules/,
-      },
+      { test: /\.js$/, loader: 'babel-loader', exclude: /node_modules/ },
+      { test: /\.html$/, loader: 'html-loader' },
+      { test: /\.(png|jpg|ico)$/, use: 'url-loader?limit=81920' },
+      { test: /\.svg$/, use: [{ loader: 'raw-loader' }] },
+      { test: /\.css$/, use: ['style-loader', 'css-loader'] }
     ].concat(vtkRules),
   },
   resolve: {

@@ -12,13 +12,15 @@
     "build:release:volume-transfer": "cross-env Example=volume-transfer.js npm run build:release",
     "build:release:image-slicing": "cross-env Example=image-slicing.js npm run build:release",
     "build:release:widgets": "cross-env Example=widgets.js npm run build:release",
+    "build:release:test": "cross-env Example=scene_viewer.js npm run build:release",
     "dev": "webpack serve --watch --content-base ./dist",
     "dev:cone": "cross-env EXAMPLE=cone.js webpack serve --mode=development",
     "dev:cone-filter": "cross-env EXAMPLE=cone-filter.js webpack serve --mode=development",
     "dev:volume": "cross-env EXAMPLE=volume.js webpack serve --mode=development",
     "dev:volume-transfer": "cross-env EXAMPLE=volume-transfer.js webpack serve --mode=development",
     "dev:image-slicing": "cross-envEXAMPLE=image-slicing.js webpack serve --mode=development",
-    "dev:widgets": "cross-env EXAMPLE=widgets.js webpack serve --mode=development"
+    "dev:widgets": "cross-env EXAMPLE=widgets.js webpack serve --mode=development",
+    "dev:test": "cross-env EXAMPLE=my_stl.js webpack serve --mode=development"
   },
   "author": "",
   "license": "BSD-3-Clause",
@@ -28,7 +30,9 @@
   "devDependencies": {
     "@webpack-cli/serve": "^1.1.0",
     "cross-env": "^7.0.3",
+    "css-loader": "^4.3.0",
     "kw-web-suite": "^11.0.0",
+    "style-loader": "^2.0.0",
     "webpack": "^4.32.2",
     "webpack-cli": "^4.0.0",
     "webpack-dev-server": "^3.5.1"
