@@ -200,7 +200,7 @@ function createPipeline(fileName, fileContents) {
         interpolateScalarsBeforeMapping: false,
         useLookupTableScalarRange: true,
         lookupTable,
-        scalarVisibility: false,
+        scalarVisibility: true,
     });
     const actor = vtkActor.newInstance();
     const scalars = source.getPointData().getScalars();

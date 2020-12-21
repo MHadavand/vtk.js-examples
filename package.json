@@ -20,7 +20,7 @@
     "dev:volume-transfer": "cross-env EXAMPLE=volume-transfer.js webpack serve --mode=development",
     "dev:image-slicing": "cross-envEXAMPLE=image-slicing.js webpack serve --mode=development",
     "dev:widgets": "cross-env EXAMPLE=widgets.js webpack serve --mode=development",
-    "dev:test": "cross-env EXAMPLE=my_stl.js webpack serve --mode=development"
+    "dev:test": "cross-env EXAMPLE=main_loader.js webpack serve --mode=development"
   },
   "author": "",
   "license": "BSD-3-Clause",
