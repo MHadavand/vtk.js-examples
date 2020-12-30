@@ -6,14 +6,9 @@ import 'vtk.js/Sources/favicon';
 import macro from 'vtk.js/Sources/macro';
 import HttpDataAccessHelper from 'vtk.js/Sources/IO/Core/DataAccessHelper/HttpDataAccessHelper';
 import vtkActor from 'vtk.js/Sources/Rendering/Core/Actor';
-import vtkGenericRenderWindow from 'vtk.js/Sources/Rendering/Misc/GenericRenderWindow';
 import vtkColorMaps from 'vtk.js/Sources/Rendering/Core/ColorTransferFunction/ColorMaps';
 import vtkColorTransferFunction from 'vtk.js/Sources/Rendering/Core/ColorTransferFunction';
 import vtkDataArray from 'vtk.js/Sources/Common/Core/DataArray';
-import vtkImageCroppingWidget from 'vtk.js/Sources/Widgets/Widgets3D/ImageCroppingWidget';
-import vtkImageCropFilter from 'vtk.js/Sources/Filters/General/ImageCropFilter';
-import vtkWidgetManager from 'vtk.js/Sources/Widgets/Core/WidgetManager';
-import vtkHttpDataSetReader from 'vtk.js/Sources/IO/Core/HttpDataSetReader';
 import vtkFullScreenRenderWindow from 'vtk.js/Sources/Rendering/Misc/FullScreenRenderWindow';
 import vtkMapper from 'vtk.js/Sources/Rendering/Core/Mapper';
 import vtkURLExtract from 'vtk.js/Sources/Common/Core/URLExtract';
@@ -24,7 +19,6 @@ import vtkSTLReader from 'vtk.js/Sources/IO/Geometry/STLReader';
 import vtkXMLImageDataReader from 'vtk.js/Sources/IO/XML/XMLImageDataReader';
 import vtkVolume from 'vtk.js/Sources/Rendering/Core/Volume';
 import vtkVolumeMapper from 'vtk.js/Sources/Rendering/Core/VolumeMapper';
-import vtkITKImageReader from 'vtk.js/Sources/IO/Misc/ITKImageReader';
 import vtkXmlReader from 'vtk.js/Sources/IO/XML/XMLReader';
 
 
@@ -43,7 +37,7 @@ let renderer;
 
 global.pipeline = {};
 
-// Process arguments from URL
+// Process arguments from URL (arguments such as fileURL can be passed)
 const userParams = vtkURLExtract.extractURLParameters();
 
 // Background handling
@@ -56,7 +50,7 @@ const selectorClass =
     : style.light;
 
 // lut
-const lutName = userParams.lut || 'erdc_rainbow_bright';
+const lutName = userParams.lut || 'Viridis (matplotlib)';
 
 // field
 const field = userParams.field || '';
@@ -166,7 +160,6 @@ function createPipeline(fileName, fileContents) {
   representationSelector.setAttribute('class', selectorClass);
   representationSelector.innerHTML = [
     'Hidden',
-    'Volume',
     'Points',
     'Wireframe',
     'Surface',
@@ -199,7 +192,19 @@ function createPipeline(fileName, fileContents) {
   // UI to show file name
   const labelSelector = document.createElement('label');
   labelSelector.setAttribute('class', selectorClass);
-  labelSelector.innerHTML = fileName;
+  console.log(fileName.replace(/^.*(\\|\/|\:)/, ''));
+  labelSelector.innerHTML = fileName.replace(/\.[^/.]+$/, "");
+
+
+  const labelOulineSelector = document.createElement('label');
+  labelOulineSelector.setAttribute('class', selectorClass);
+  labelOulineSelector.innerHTML = "OutlineBox";
+
+  const outlineSelector = document.createElement('input');
+  outlineSelector.setAttribute('class', selectorClass);
+  outlineSelector.setAttribute('type', 'checkbox');
+  outlineSelector.setAttribute('id', 'OutlineCheckBox');
+   outlineSelector.setAttribute('checked', 'checked');
 
   // Add controller to container
   const controlContainer = document.createElement('div');
@@ -209,7 +214,9 @@ function createPipeline(fileName, fileContents) {
   controlContainer.appendChild(presetSelector);
   controlContainer.appendChild(colorBySelector);
   controlContainer.appendChild(componentSelector);
-  controlContainer.appendChild(opacitySelector)
+  controlContainer.appendChild(opacitySelector);
+  controlContainer.appendChild(labelOulineSelector);
+  controlContainer.appendChild(outlineSelector);
   rootControllerContainer.appendChild(controlContainer);
 
   // set up outline filter
@@ -229,22 +236,13 @@ function createPipeline(fileName, fileContents) {
       vtkEntity.parseAsArrayBuffer(fileContents);
       break;
     case 'vti':
-      console.log(fileContents);
       vtkEntity = vtkXMLImageDataReader.newInstance()
       vtkEntity.parseAsArrayBuffer(fileContents);
       break;
-    case 'vtu':
-      console.log('here');
-      alert('Under construction!')
-      break;
-      console.log(fileContents);
-      vtkEntity = vtkXmlReader.newInstance()
-      vtkEntity.parseAsArrayBuffer(fileContents);
-      console.log(vtkEntity);
   }
 
   const lookupTable = vtkColorTransferFunction.newInstance();
-  const source = vtkEntity.getOutputData(0);
+  const source = vtkEntity.getOutputData();
 
   let actor;
   let mapper;
@@ -268,7 +266,9 @@ function createPipeline(fileName, fileContents) {
     });
   }
 
+  console.log(source.getPointData(), source.getPointData().getScalars(), 'dude!!!')
   const scalars = source.getPointData().getScalars();
+
   const dataRange = [].concat(scalars ? scalars.getRange() : [0, 1]);
   let activeArray = vtkDataArray;
 
@@ -278,7 +278,7 @@ function createPipeline(fileName, fileContents) {
   function applyPreset() {
     const preset = vtkColorMaps.getPresetByName(presetSelector.value);
     lookupTable.applyColorMap(preset);
-    lookupTable.setMappingRange(dataRange[0], dataRange[1]);
+    lookupTable.setMappingRange(...dataRange);
     lookupTable.updateRange();
   }
   applyPreset();
@@ -311,6 +311,25 @@ function createPipeline(fileName, fileContents) {
   }
 
   opacitySelector.addEventListener('input', updateOpacity);
+
+   // --------------------------------------------------------------------
+  // outline box display option handling
+  // -------------------------------------------------------------------
+  function updateOutlineFilterDsiplay(event){
+    console.log(event.target)
+    if (event.target.checked)
+    {
+      renderer.addActor(outlineActor);
+      renderWindow.render();
+    }
+    else
+    {
+      renderer.removeActor(outlineActor);
+      renderWindow.render();
+    }
+
+  }
+  outlineSelector.addEventListener('click', updateOutlineFilterDsiplay);
 
   // --------------------------------------------------------------------
   // ColorBy handling
@@ -534,7 +553,7 @@ export function initLocalFileLoader(container) {
   }
 
   const fileContainer = document.createElement('div');
-  fileContainer.innerHTML = `<div class="${style.bigFileDrop}"/><input type="file" multiple accept=".vtp,.stl,.vtk,.vti, .vtu" style="display: none;"/>`;
+  fileContainer.innerHTML = `<div class="${style.bigFileDrop}"/><input type="file" multiple accept=".vtp,.stl,.vtk,.vti" style="display: none;"/>`;
   myContainer.appendChild(fileContainer);
 
   const fileInput = fileContainer.querySelector('input');
