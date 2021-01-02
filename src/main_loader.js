@@ -20,6 +20,7 @@ import vtkXMLImageDataReader from 'vtk.js/Sources/IO/XML/XMLImageDataReader';
 import vtkVolume from 'vtk.js/Sources/Rendering/Core/Volume';
 import vtkVolumeMapper from 'vtk.js/Sources/Rendering/Core/VolumeMapper';
 import vtkXmlReader from 'vtk.js/Sources/IO/XML/XMLReader';
+import createScalarMap from './create_scalarmap'
 
 
 import {
@@ -196,15 +197,22 @@ function createPipeline(fileName, fileContents) {
   labelSelector.innerHTML = fileName.replace(/\.[^/.]+$/, "");
 
 
-  const labelOulineSelector = document.createElement('label');
-  labelOulineSelector.setAttribute('class', selectorClass);
-  labelOulineSelector.innerHTML = "OutlineBox";
+  const labelOutlineSelector = document.createElement('label');
+  labelOutlineSelector.setAttribute('class', selectorClass);
+  labelOutlineSelector.setAttribute('htmlFor', 'OutlineCheckBox')
+  labelOutlineSelector.innerHTML = "OutlineBox";
 
   const outlineSelector = document.createElement('input');
-  outlineSelector.setAttribute('class', selectorClass);
   outlineSelector.setAttribute('type', 'checkbox');
   outlineSelector.setAttribute('id', 'OutlineCheckBox');
-   outlineSelector.setAttribute('checked', 'checked');
+  outlineSelector.setAttribute('name', 'OutlineCheckBox');
+  outlineSelector.setAttribute('checked', 'checked');
+
+  var colorMapCanvas = document.createElement('canvas');
+  colorMapCanvas.setAttribute('class', style.canvas);
+  colorMapCanvas.setAttribute('id', 'cv');
+  colorMapCanvas.height = 20;
+  colorMapCanvas.width = 200;
 
   // Add controller to container
   const controlContainer = document.createElement('div');
@@ -215,9 +223,11 @@ function createPipeline(fileName, fileContents) {
   controlContainer.appendChild(colorBySelector);
   controlContainer.appendChild(componentSelector);
   controlContainer.appendChild(opacitySelector);
-  controlContainer.appendChild(labelOulineSelector);
   controlContainer.appendChild(outlineSelector);
+  controlContainer.appendChild(labelOutlineSelector);
+  controlContainer.appendChild(colorMapCanvas);
   rootControllerContainer.appendChild(controlContainer);
+
 
   // set up outline filter
   const outlineActor = vtkActor.newInstance();
@@ -280,6 +290,14 @@ function createPipeline(fileName, fileContents) {
     lookupTable.applyColorMap(preset);
     lookupTable.setMappingRange(...dataRange);
     lookupTable.updateRange();
+    console.log(colorBySelector.value);
+    if (colorBySelector.value === ':') {
+      colorMapCanvas.style.display = 'none';
+    }
+    else {
+      colorMapCanvas.style.display = 'block';
+      updateColorCanvas(lookupTable, dataRange)
+    }
   }
   applyPreset();
   presetSelector.addEventListener('change', applyPreset);
@@ -312,29 +330,72 @@ function createPipeline(fileName, fileContents) {
 
   opacitySelector.addEventListener('input', updateOpacity);
 
-   // --------------------------------------------------------------------
+  // --------------------------------------------------------------------
   // outline box display option handling
   // -------------------------------------------------------------------
-  function updateOutlineFilterDsiplay(event){
+  function updateOutlineFilterDisplay(event) {
     console.log(event.target)
-    if (event.target.checked)
-    {
+    if (event.target.checked) {
       renderer.addActor(outlineActor);
       renderWindow.render();
     }
-    else
-    {
+    else {
       renderer.removeActor(outlineActor);
       renderWindow.render();
     }
 
   }
-  outlineSelector.addEventListener('click', updateOutlineFilterDsiplay);
+  outlineSelector.addEventListener('click', updateOutlineFilterDisplay);
+
+  // --------------------------------------------------------------------
+  // Color map canvas update
+  // --------------------------------------------------------------------
+  function updateColorCanvas(colorTransferFunction, rangeToUse, canvas) {
+    const workCanvas = canvas || colorMapCanvas || document.createElement('canvas');
+
+    let width;
+    let height;
+
+    if (workCanvas === canvas) {
+      workCanvas.setAttribute('class', canvasClass);
+    }
+
+    console.log(workCanvas.height, workCanvas.height);
+    width = workCanvas.width - 80;
+    height = 256;
+
+    const ctx = workCanvas.getContext('2d');
+    ctx.clearRect(0, 0, workCanvas.width, workCanvas.height);
+
+    const rgba = colorTransferFunction.getUint8Table(
+      rangeToUse[0],
+      rangeToUse[1],
+      width,
+      4
+    );
+    const pixelsArea = ctx.getImageData(10, 0, width, height);
+    for (let lineIdx = 0; lineIdx < height; lineIdx++) {
+      pixelsArea.data.set(rgba, lineIdx * 4 * width);
+    }
+
+    const nbValues = height - 1 * width * 4;
+    const lineSize = width * 4;
+    for (let i = 3; i < nbValues; i += 4) {
+      pixelsArea.data[i] = height - 1 - Math.floor(i / lineSize);
+    }
+    ctx.putImageData(pixelsArea, 20, 0);
+
+    ctx.font = 'bold 10px serif';
+    ctx.textAlign = "left";
+    ctx.fillText(rangeToUse[0].toFixed(2).toString(), 0, workCanvas.height / 2);
+    ctx.fillText(rangeToUse[1].toFixed(2).toString(), workCanvas.width - 40, workCanvas.height / 2);
+    ctx.save();
+
+  }
 
   // --------------------------------------------------------------------
   // ColorBy handling
   // --------------------------------------------------------------------
-
   const colorByOptions = [{ value: ':', label: 'Solid color' }].concat(
     source
       .getPointData()
