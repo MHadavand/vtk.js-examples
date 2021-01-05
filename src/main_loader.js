@@ -19,8 +19,6 @@ import vtkSTLReader from 'vtk.js/Sources/IO/Geometry/STLReader';
 import vtkXMLImageDataReader from 'vtk.js/Sources/IO/XML/XMLImageDataReader';
 import vtkVolume from 'vtk.js/Sources/Rendering/Core/Volume';
 import vtkVolumeMapper from 'vtk.js/Sources/Rendering/Core/VolumeMapper';
-import vtkXmlReader from 'vtk.js/Sources/IO/XML/XMLReader';
-import createScalarMap from './create_scalarmap'
 
 
 import {
@@ -206,12 +204,12 @@ function createPipeline(fileName, fileContents) {
   outlineSelector.setAttribute('type', 'checkbox');
   outlineSelector.setAttribute('id', 'OutlineCheckBox');
   outlineSelector.setAttribute('name', 'OutlineCheckBox');
-  outlineSelector.setAttribute('checked', 'checked');
+  outlineSelector.checked = false;
 
   var colorMapCanvas = document.createElement('canvas');
   colorMapCanvas.setAttribute('class', style.canvas);
   colorMapCanvas.setAttribute('id', 'cv');
-  colorMapCanvas.height = 20;
+  colorMapCanvas.height = 15;
   colorMapCanvas.width = 200;
 
   // Add controller to container
@@ -360,12 +358,20 @@ function createPipeline(fileName, fileContents) {
       workCanvas.setAttribute('class', canvasClass);
     }
 
-    console.log(workCanvas.height, workCanvas.height);
-    width = workCanvas.width - 80;
-    height = 256;
+    let range1 = rangeToUse[0].toFixed(2).toString();
+    let range2 = rangeToUse[1].toFixed(2).toString();
 
     const ctx = workCanvas.getContext('2d');
     ctx.clearRect(0, 0, workCanvas.width, workCanvas.height);
+    ctx.font = '10px serif';
+
+    let range1_width = Math.round(ctx.measureText(range1).width);
+    let range2_width = Math.round(ctx.measureText(range2).width);
+
+    width = 150;
+    let offset = 14;
+    workCanvas.width = width + (range1_width + range2_width) + offset;
+    height = workCanvas.height;
 
     const rgba = colorTransferFunction.getUint8Table(
       rangeToUse[0],
@@ -373,7 +379,7 @@ function createPipeline(fileName, fileContents) {
       width,
       4
     );
-    const pixelsArea = ctx.getImageData(10, 0, width, height);
+    const pixelsArea = ctx.getImageData(range1_width + (offset / 2 - 2), 0, width, height);
     for (let lineIdx = 0; lineIdx < height; lineIdx++) {
       pixelsArea.data.set(rgba, lineIdx * 4 * width);
     }
@@ -383,12 +389,13 @@ function createPipeline(fileName, fileContents) {
     for (let i = 3; i < nbValues; i += 4) {
       pixelsArea.data[i] = height - 1 - Math.floor(i / lineSize);
     }
-    ctx.putImageData(pixelsArea, 20, 0);
+    ctx.putImageData(pixelsArea, range1_width + 5, 0);
 
-    ctx.font = 'bold 10px serif';
+
     ctx.textAlign = "left";
-    ctx.fillText(rangeToUse[0].toFixed(2).toString(), 0, workCanvas.height / 2);
-    ctx.fillText(rangeToUse[1].toFixed(2).toString(), workCanvas.width - 40, workCanvas.height / 2);
+    ctx.fillText(range1, 0, workCanvas.height / 2);
+    ctx.textAlign = "left";
+    ctx.fillText(range2, range1_width + width + (offset / 2 + 2), workCanvas.height / 2);
     ctx.save();
 
   }
@@ -515,8 +522,6 @@ function createPipeline(fileName, fileContents) {
     renderer.addActor(actor);
   }
 
-  renderer.addActor(outlineActor);
-
   // Manage update when lookupTable change
   lookupTable.onModified(() => {
     renderWindow.render();
@@ -551,10 +556,20 @@ export function load(container, options) {
   if (options.files) {
     createViewer(container);
     let count = options.files.length;
-    console.log(count, 'count at load');
+
+    let sortedFiles = [];
     while (count--) {
-      loadFile(options.files[count]);
+      console.log(options.files[count])
+      sortedFiles.push(options.files[count])
     }
+    sortedFiles.sort((a, b) => (a.name > b.name) ? 1 : ((b.name > a.name) ? -1 : 0));
+
+    console.log(sortedFiles, 'sorted file');
+
+    for (var i = 0; i < sortedFiles.length; i++) {
+      loadFile(sortedFiles[i]);
+    }
+
     updateCamera(renderer.getActiveCamera());
   } else if (options.fileURL) {
     const urls = [].concat(options.fileURL);
@@ -626,6 +641,7 @@ export function initLocalFileLoader(container) {
     const files = e.target.files || dataTransfer.files;
     if (files.length > 0) {
       myContainer.removeChild(fileContainer);
+      console.log(typeof (files), files)
       load(myContainer, { files });
     }
   }

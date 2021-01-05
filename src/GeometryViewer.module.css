@@ -75,7 +75,7 @@
 }
 
 label.selector {
-  font-size: 12px;
+  font-size: 11px;
   color: blue;
   text-overflow: ellipsis;
   overflow: hidden;
@@ -126,6 +126,4 @@ select:focus {
 
 .canvas {
     display: block;
-    width: 200px;
-    height: 20px;
 }
