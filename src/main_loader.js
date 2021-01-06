@@ -19,6 +19,9 @@ import vtkSTLReader from 'vtk.js/Sources/IO/Geometry/STLReader';
 import vtkXMLImageDataReader from 'vtk.js/Sources/IO/XML/XMLImageDataReader';
 import vtkVolume from 'vtk.js/Sources/Rendering/Core/Volume';
 import vtkVolumeMapper from 'vtk.js/Sources/Rendering/Core/VolumeMapper';
+import vtkAxesActor from 'vtk.js/Sources/Rendering/Core/AxesActor';
+import vtkOrientationMarkerWidget from 'vtk.js/Sources/Interaction/Widgets/OrientationMarkerWidget';
+
 
 
 import {
@@ -30,7 +33,8 @@ import style from './GeometryViewer.module.css';
 import icon from './favicon.ico';
 
 let autoInit = true;
-let background = [0.89, 0.89, 0.89];
+let background = [0.92, 0.92, 0.92];
+let scaleArray = [1, 1, 1];
 let renderWindow;
 let renderer;
 
@@ -43,11 +47,20 @@ const userParams = vtkURLExtract.extractURLParameters();
 if (userParams.background) {
   background = userParams.background.split(',').map((s) => Number(s));
 }
+
+let colorTheme = background.length === 3 && background.reduce((a, b) => a + b, 0) < 1.5
+  ? 'dark' : 'light';
+
 const selectorClass =
-  background.length === 3 && background.reduce((a, b) => a + b, 0) < 1.5
+  colorTheme === 'dark'
     ? style.dark
     : style.light;
 
+const outlineColor = colorTheme === 'dark' ? [1, 1, 1] : [0, 0, 0]
+
+if (userParams.scale) {
+  scaleArray = userParams.scale
+}
 // lut
 const lutName = userParams.lut || 'Viridis (matplotlib)';
 
@@ -70,6 +83,37 @@ function preventDefaults(e) {
   e.preventDefault();
   e.stopPropagation();
 }
+
+function createOrientationAxes(interactor) {
+
+  const initialValues = {
+    config: {
+      tipResolution: 60,
+      tipRadius: 0.05,
+      tipLength: 0.1,
+      shaftResolution: 60,
+      shaftRadius: 0.02,
+      invert: false,
+    },
+    xAxisColor: [255, 0, 0],
+    yAxisColor: [255, 255, 0],
+    zAxisColor: [0, 128, 0],
+  }
+  const orientationAxes = vtkAxesActor.newInstance(initialValues)
+  const orientationWidget = vtkOrientationMarkerWidget.newInstance({
+    actor: orientationAxes,
+    interactor: interactor,
+  });
+
+  orientationWidget.setEnabled(true);
+  orientationWidget.setViewportCorner(
+    vtkOrientationMarkerWidget.Corners.BOTTOM_LEFT
+  );
+  orientationWidget.setViewportSize(0.15);
+  orientationWidget.setMinPixelSize(100);
+  orientationWidget.setMaxPixelSize(300);
+}
+
 
 // ----------------------------------------------------------------------------
 // DOM containers for UI control
@@ -135,13 +179,13 @@ function createViewer(container) {
     fpsMonitor.setContainer(container);
     fullScreenRenderer.setResizeCallback(fpsMonitor.update);
   }
+
+  createOrientationAxes(renderWindow.getInteractor());
 }
 
 // ----------------------------------------------------------------------------
 
 function createPipeline(fileName, fileContents) {
-
-  console.log(fileName);
 
   // Create UI for color map selection
   const presetSelector = document.createElement('select');
@@ -188,10 +232,18 @@ function createPipeline(fileName, fileContents) {
   opacitySelector.setAttribute('max', '100');
   opacitySelector.setAttribute('min', '1');
 
+  // create UI for point size selector
+  const pointSizeSelector = document.createElement('input');
+  pointSizeSelector.setAttribute('class', selectorClass);
+  pointSizeSelector.setAttribute('type', 'range');
+  pointSizeSelector.setAttribute('value', '5');
+  pointSizeSelector.setAttribute('max', '20');
+  pointSizeSelector.setAttribute('min', '1');
+  pointSizeSelector.style.display = ((representationSelector.value === '1:0:0') ? 'block' : 'none') // display for points
+
   // UI to show file name
   const labelSelector = document.createElement('label');
   labelSelector.setAttribute('class', selectorClass);
-  console.log(fileName.replace(/^.*(\\|\/|\:)/, ''));
   labelSelector.innerHTML = fileName.replace(/\.[^/.]+$/, "");
 
 
@@ -224,11 +276,13 @@ function createPipeline(fileName, fileContents) {
   controlContainer.appendChild(outlineSelector);
   controlContainer.appendChild(labelOutlineSelector);
   controlContainer.appendChild(colorMapCanvas);
+  controlContainer.appendChild(pointSizeSelector);
   rootControllerContainer.appendChild(controlContainer);
 
 
   // set up outline filter
-  const outlineActor = vtkActor.newInstance();
+  const outlineActor = vtkActor.newInstance({ 'scale': scaleArray, 'dragable': 1 });
+  outlineActor.getProperty().setColor(...outlineColor)
   const outlineMapper = vtkMapper.newInstance();
 
   // Visualization Loader
@@ -255,7 +309,7 @@ function createPipeline(fileName, fileContents) {
   let actor;
   let mapper;
   if (ext === 'vti') {
-    actor = vtkVolume.newInstance();
+    actor = vtkVolume.newInstance({ 'scale': scaleArray, 'dragable': 1 });
     mapper = vtkVolumeMapper.newInstance({
       interpolateScalarsBeforeMapping: false,
       useLookupTableScalarRange: true,
@@ -265,7 +319,7 @@ function createPipeline(fileName, fileContents) {
   }
   else {
     // --- Set up the actor and mapper ---
-    actor = vtkActor.newInstance();
+    actor = vtkActor.newInstance({ 'scale': scaleArray, 'dragable': 1 });
     mapper = vtkMapper.newInstance({
       interpolateScalarsBeforeMapping: false,
       useLookupTableScalarRange: true,
@@ -274,7 +328,11 @@ function createPipeline(fileName, fileContents) {
     });
   }
 
-  console.log(source.getPointData(), source.getPointData().getScalars(), 'dude!!!')
+  actor.getProperty().setLineWidth(50);
+  console.log(actor.getProperty().getLineWidth);
+  // initialize the point size
+  actor.getProperty().setPointSize(pointSizeSelector.value);
+
   const scalars = source.getPointData().getScalars();
 
   const dataRange = [].concat(scalars ? scalars.getRange() : [0, 1]);
@@ -288,7 +346,6 @@ function createPipeline(fileName, fileContents) {
     lookupTable.applyColorMap(preset);
     lookupTable.setMappingRange(...dataRange);
     lookupTable.updateRange();
-    console.log(colorBySelector.value);
     if (colorBySelector.value === ':') {
       colorMapCanvas.style.display = 'none';
     }
@@ -303,7 +360,6 @@ function createPipeline(fileName, fileContents) {
   // --------------------------------------------------------------------
   // Representation handling
   // --------------------------------------------------------------------
-
   function updateRepresentation(event) {
     const [
       visibility,
@@ -312,6 +368,14 @@ function createPipeline(fileName, fileContents) {
     ] = event.target.value.split(':').map(Number);
     actor.getProperty().set({ representation, edgeVisibility });
     actor.setVisibility(!!visibility);
+
+    if (representation === 0 && visibility === 1) {
+      pointSizeSelector.style.display = 'block'
+    }
+    else {
+      pointSizeSelector.style.display = 'none'
+    }
+
     renderWindow.render();
   }
   representationSelector.addEventListener('change', updateRepresentation);
@@ -328,11 +392,21 @@ function createPipeline(fileName, fileContents) {
 
   opacitySelector.addEventListener('input', updateOpacity);
 
+
+  // --------------------------------------------------------------------
+  // point size handling
+  // --------------------------------------------------------------------
+  function updatePointSize(event) {
+    const pointSize = Number(event.target.value);
+    actor.getProperty().setPointSize(pointSize);
+    renderWindow.render();
+  }
+
+  pointSizeSelector.addEventListener('input', updatePointSize)
   // --------------------------------------------------------------------
   // outline box display option handling
   // -------------------------------------------------------------------
   function updateOutlineFilterDisplay(event) {
-    console.log(event.target)
     if (event.target.checked) {
       renderer.addActor(outlineActor);
       renderWindow.render();
@@ -538,7 +612,6 @@ function createPipeline(fileName, fileContents) {
 // ----------------------------------------------------------------------------
 
 function loadFile(file) {
-  console.log(file, 'file at loadFile')
   const reader = new FileReader();
   reader.onload = function onLoad(e) {
     createPipeline(file.name, reader.result);
@@ -551,7 +624,6 @@ function loadFile(file) {
 export function load(container, options) {
   autoInit = false;
   emptyContainer(container);
-  console.log(options, 'options at load');
 
   if (options.files) {
     createViewer(container);
@@ -559,12 +631,9 @@ export function load(container, options) {
 
     let sortedFiles = [];
     while (count--) {
-      console.log(options.files[count])
       sortedFiles.push(options.files[count])
     }
     sortedFiles.sort((a, b) => (a.name > b.name) ? 1 : ((b.name > a.name) ? -1 : 0));
-
-    console.log(sortedFiles, 'sorted file');
 
     for (var i = 0; i < sortedFiles.length; i++) {
       loadFile(sortedFiles[i]);
@@ -636,12 +705,10 @@ export function initLocalFileLoader(container) {
 
   function handleFile(e) {
     preventDefaults(e);
-    console.log(e);
     const dataTransfer = e.dataTransfer;
     const files = e.target.files || dataTransfer.files;
     if (files.length > 0) {
       myContainer.removeChild(fileContainer);
-      console.log(typeof (files), files)
       load(myContainer, { files });
     }
   }
