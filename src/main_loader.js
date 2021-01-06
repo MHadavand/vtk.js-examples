@@ -29,7 +29,7 @@ import {
   ScalarMode,
 } from 'vtk.js/Sources/Rendering/Core/Mapper/Constants';
 
-import style from './GeometryViewer.module.css';
+import style from './VisualBundle.module.css';
 import icon from './favicon.ico';
 
 let autoInit = true;
@@ -40,7 +40,10 @@ let renderer;
 
 global.pipeline = {};
 
-// Process arguments from URL (arguments such as fileURL can be passed)
+
+// -----------------------------------------
+// Get user parameters and set defaults
+// -----------------------------------------
 const userParams = vtkURLExtract.extractURLParameters();
 
 // Background handling
@@ -67,6 +70,11 @@ const lutName = userParams.lut || 'Viridis (matplotlib)';
 // field
 const field = userParams.field || '';
 
+//
+// -------------------------------------------------------------------------
+// Functions for global settings including camera and orientation axes
+// -------------------------------------------------------------------------
+
 // camera
 function updateCamera(camera) {
   ['zoom', 'pitch', 'elevation', 'yaw', 'azimuth', 'roll', 'dolly'].forEach(
@@ -84,6 +92,7 @@ function preventDefaults(e) {
   e.stopPropagation();
 }
 
+// orientation axes
 function createOrientationAxes(interactor) {
 
   const initialValues = {
@@ -118,9 +127,57 @@ function createOrientationAxes(interactor) {
 // ----------------------------------------------------------------------------
 // DOM containers for UI control
 // ----------------------------------------------------------------------------
+var head = document.head;
+var linkAwesome = document.createElement("link");
+linkAwesome.type = "text/css";
+linkAwesome.rel = "stylesheet";
+linkAwesome.href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css";
+head.appendChild(linkAwesome);
+
+var linkBootStrap = document.createElement("link");
+linkBootStrap.type = "text/css";
+linkBootStrap.rel = "stylesheet";
+linkBootStrap.href = "https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css"
+head.appendChild(linkBootStrap);
+
+var linkMainStyle = document.createElement("link");
+linkMainStyle.type = "text/css";
+linkMainStyle.rel = "stylesheet";
+linkMainStyle.href = "./style.main.css"
+head.appendChild(linkMainStyle);
+
 
 const rootControllerContainer = document.createElement('div');
 rootControllerContainer.setAttribute('class', style.rootController);
+
+// Camera settings
+const cameraButtonGroup = document.createElement('div');
+cameraButtonGroup.setAttribute('class', "btn-group");
+
+const resetCameraButton = document.createElement('button');
+resetCameraButton.setAttribute('class', "btn btn-primary");
+resetCameraButton.innerHTML = '<i class="fa fa-refresh"></i>';
+cameraButtonGroup.appendChild(resetCameraButton);
+
+const xNormalButton = document.createElement('button');
+xNormalButton.setAttribute('class', "btn btn-primary");
+xNormalButton.innerHTML = '<i class="fa fa-refresh"></i>';
+cameraButtonGroup.appendChild(xNormalButton);
+
+const darkBackGroundButton = document.createElement('button');
+darkBackGroundButton.setAttribute('class', "btn btn-primary");
+darkBackGroundButton.setAttribute('id', 'darkButton')
+darkBackGroundButton.innerHTML = 'Dark';
+cameraButtonGroup.appendChild(darkBackGroundButton);
+
+
+const lightBackGroundButton = document.createElement('button');
+lightBackGroundButton.setAttribute('class', "btn btn-primary");
+lightBackGroundButton.setAttribute('id', 'lightButton')
+lightBackGroundButton.innerHTML = 'Light';
+cameraButtonGroup.appendChild(lightBackGroundButton);
+
+
 
 const addDataSetButton = document.createElement('img');
 addDataSetButton.setAttribute('class', style.button);
@@ -166,6 +223,7 @@ function createViewer(container) {
   renderWindow.getInteractor().setDesiredUpdateRate(15);
 
   container.appendChild(rootControllerContainer);
+  container.appendChild(cameraButtonGroup);
   container.appendChild(addDataSetButton);
 
   if (userParams.fps) {
@@ -181,11 +239,41 @@ function createViewer(container) {
   }
 
   createOrientationAxes(renderWindow.getInteractor());
+
+  resetCameraButton.addEventListener('click', () => {
+    renderer.resetCamera();
+    renderWindow.render();
+  })
+
+  xNormalButton.addEventListener('click', () => {
+
+    console.log(renderer.getActiveCamera().getViewPlaneNormal(), renderer.getActiveCamera().getViewMatrix(), renderer.getActiveCamera().getFocalPoint(), renderer.getActiveCamera(), renderer);
+
+    renderer.getActiveCamera().applyTransform([1, 0, 0, -862.28076171875, 0, 1, 0, -12267.353515625, 0, 0, 1, -2441.853515625, 0, 0, 0, 1]);
+
+    // renderer.resetCamera();
+    renderWindow.render();
+  }
+  )
+
+  darkBackGroundButton.addEventListener('click', () => {
+    renderer.setBackground([0.15, 0.15, 0.15]);
+    renderWindow.render();
+  })
+
+  lightBackGroundButton.addEventListener('click', () => {
+    renderer.setBackground([0.92, 0.92, 0.92]);
+    renderWindow.render();
+  })
 }
 
 // ----------------------------------------------------------------------------
 
 function createPipeline(fileName, fileContents) {
+
+  // ----------------------------------------------------------------------------
+  // HTML elements for dynamic user settings
+  // ----------------------------------------------------------------------------
 
   // Create UI for color map selection
   const presetSelector = document.createElement('select');
@@ -214,12 +302,13 @@ function createPipeline(fileName, fileContents) {
         }">${name}</option>`
     )
     .join('');
-  representationSelector.value = '1:2:0'
+  representationSelector.value = '1:2:0' // default to surfaces
 
   // Creat UI for color by attribute
   const colorBySelector = document.createElement('select');
   colorBySelector.setAttribute('class', selectorClass);
 
+  // Component selector for cases that there are multiple components for one attribute
   const componentSelector = document.createElement('select');
   componentSelector.setAttribute('class', selectorClass);
   componentSelector.style.display = 'none';
@@ -246,25 +335,27 @@ function createPipeline(fileName, fileContents) {
   labelSelector.setAttribute('class', selectorClass);
   labelSelector.innerHTML = fileName.replace(/\.[^/.]+$/, "");
 
-
+  // Option to show or hide the outline
+  //label
   const labelOutlineSelector = document.createElement('label');
   labelOutlineSelector.setAttribute('class', selectorClass);
   labelOutlineSelector.setAttribute('htmlFor', 'OutlineCheckBox')
   labelOutlineSelector.innerHTML = "OutlineBox";
-
+  //selector
   const outlineSelector = document.createElement('input');
   outlineSelector.setAttribute('type', 'checkbox');
   outlineSelector.setAttribute('id', 'OutlineCheckBox');
   outlineSelector.setAttribute('name', 'OutlineCheckBox');
   outlineSelector.checked = false;
 
+  // color map canvas
   var colorMapCanvas = document.createElement('canvas');
   colorMapCanvas.setAttribute('class', style.canvas);
   colorMapCanvas.setAttribute('id', 'cv');
   colorMapCanvas.height = 15;
   colorMapCanvas.width = 200;
 
-  // Add controller to container
+  // Add elements to controller and controller to container
   const controlContainer = document.createElement('div');
   controlContainer.setAttribute('class', style.control);
   controlContainer.appendChild(labelSelector);
@@ -280,12 +371,11 @@ function createPipeline(fileName, fileContents) {
   rootControllerContainer.appendChild(controlContainer);
 
 
-  // set up outline filter
-  const outlineActor = vtkActor.newInstance({ 'scale': scaleArray, 'dragable': 1 });
-  outlineActor.getProperty().setColor(...outlineColor)
-  const outlineMapper = vtkMapper.newInstance();
+  // ----------------------------------------------------------------------------
+  // Visualization components (vtk files and vtk.js architecture)
+  // ----------------------------------------------------------------------------
 
-  // Visualization Loader
+  // Visualization Loader (read the file content)
   let ext = fileName.substr(fileName.lastIndexOf('.') + 1);
   let vtkEntity
   switch (ext) {
@@ -303,9 +393,10 @@ function createPipeline(fileName, fileContents) {
       break;
   }
 
+  // Look up table for color maps
   const lookupTable = vtkColorTransferFunction.newInstance();
-  const source = vtkEntity.getOutputData();
 
+  // Main actor and mapper for visualization component
   let actor;
   let mapper;
   if (ext === 'vti') {
@@ -318,7 +409,6 @@ function createPipeline(fileName, fileContents) {
     });
   }
   else {
-    // --- Set up the actor and mapper ---
     actor = vtkActor.newInstance({ 'scale': scaleArray, 'dragable': 1 });
     mapper = vtkMapper.newInstance({
       interpolateScalarsBeforeMapping: false,
@@ -328,19 +418,28 @@ function createPipeline(fileName, fileContents) {
     });
   }
 
-  actor.getProperty().setLineWidth(50);
-  console.log(actor.getProperty().getLineWidth);
-  // initialize the point size
-  actor.getProperty().setPointSize(pointSizeSelector.value);
 
+  // Filter setup (actor and mapper)
+  //---------------------------------------------
+  const outlineFilter = vtkOutlineFilter.newInstance();
+  const outlineActor = vtkActor.newInstance({ 'scale': scaleArray, 'dragable': 1 });
+  const outlineMapper = vtkMapper.newInstance();
+
+
+  // Get data range (mainly used or color map updates)
+  const source = vtkEntity.getOutputData();
   const scalars = source.getPointData().getScalars();
 
   const dataRange = [].concat(scalars ? scalars.getRange() : [0, 1]);
   let activeArray = vtkDataArray;
 
+
   // --------------------------------------------------------------------
-  // Color handling
-  // --------------------------------------------------------------------
+  // Call backs for handling user changes
+  // -------------------------------------------------------------------
+
+
+  // Color map selection handling
   function applyPreset() {
     const preset = vtkColorMaps.getPresetByName(presetSelector.value);
     lookupTable.applyColorMap(preset);
@@ -357,9 +456,7 @@ function createPipeline(fileName, fileContents) {
   applyPreset();
   presetSelector.addEventListener('change', applyPreset);
 
-  // --------------------------------------------------------------------
   // Representation handling
-  // --------------------------------------------------------------------
   function updateRepresentation(event) {
     const [
       visibility,
@@ -380,10 +477,8 @@ function createPipeline(fileName, fileContents) {
   }
   representationSelector.addEventListener('change', updateRepresentation);
 
-  // --------------------------------------------------------------------
-  // Opacity handling
-  // --------------------------------------------------------------------
 
+  // Opacity handling
   function updateOpacity(event) {
     const opacity = Number(event.target.value) / 100;
     actor.getProperty().setOpacity(opacity);
@@ -393,9 +488,7 @@ function createPipeline(fileName, fileContents) {
   opacitySelector.addEventListener('input', updateOpacity);
 
 
-  // --------------------------------------------------------------------
   // point size handling
-  // --------------------------------------------------------------------
   function updatePointSize(event) {
     const pointSize = Number(event.target.value);
     actor.getProperty().setPointSize(pointSize);
@@ -403,9 +496,9 @@ function createPipeline(fileName, fileContents) {
   }
 
   pointSizeSelector.addEventListener('input', updatePointSize)
-  // --------------------------------------------------------------------
+
+
   // outline box display option handling
-  // -------------------------------------------------------------------
   function updateOutlineFilterDisplay(event) {
     if (event.target.checked) {
       renderer.addActor(outlineActor);
@@ -419,9 +512,9 @@ function createPipeline(fileName, fileContents) {
   }
   outlineSelector.addEventListener('click', updateOutlineFilterDisplay);
 
-  // --------------------------------------------------------------------
-  // Color map canvas update
-  // --------------------------------------------------------------------
+
+
+  // Color map canvas update handling
   function updateColorCanvas(colorTransferFunction, rangeToUse, canvas) {
     const workCanvas = canvas || colorMapCanvas || document.createElement('canvas');
 
@@ -474,9 +567,8 @@ function createPipeline(fileName, fileContents) {
 
   }
 
-  // --------------------------------------------------------------------
+
   // ColorBy handling
-  // --------------------------------------------------------------------
   const colorByOptions = [{ value: ':', label: 'Solid color' }].concat(
     source
       .getPointData()
@@ -574,21 +666,25 @@ function createPipeline(fileName, fileContents) {
   componentSelector.addEventListener('change', updateColorByComponent);
 
 
-  // --- set up our filter
-  const filter = vtkOutlineFilter.newInstance();
-
-  // coneSource -> filter
-  filter.setInputConnection(vtkEntity.getOutputPort());
+  //---------------------------------------
+  // VTK wiring
+  //--------------------------------------
 
   // mapper to the object it self
   mapper.setInputConnection(vtkEntity.getOutputPort());
-  // filter -> mapper
-  outlineMapper.setInputConnection(filter.getOutputPort());
-
-  // tell the actor which mapper to use
   actor.setMapper(mapper);
+
+  // Filter wiring
+  outlineFilter.setInputConnection(vtkEntity.getOutputPort());
+  outlineMapper.setInputConnection(outlineFilter.getOutputPort());
   outlineActor.setMapper(outlineMapper);
 
+
+  // initialization for actors
+  outlineActor.getProperty().setColor(...outlineColor)
+  actor.getProperty().setPointSize(pointSizeSelector.value);
+
+  // Adding actors
   if (ext === 'vti') {
     renderer.addVolume(actor);
   }
@@ -601,12 +697,13 @@ function createPipeline(fileName, fileContents) {
     renderWindow.render();
   });
 
-  renderer.resetCamera();
-  renderWindow.render();
-
-  filter.onModified(() => {
+  // Manage update when outline filter changes
+  outlineFilter.onModified(() => {
     renderWindow.render();
   });
+
+  renderer.resetCamera();
+  renderWindow.render();
 }
 
 // ----------------------------------------------------------------------------

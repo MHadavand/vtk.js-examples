@@ -1,0 +1,45 @@
+
+.btn-group {
+  position: absolute;
+  right: 10%;
+  left:10%;
+  bottom: 5px;
+  width: 80%;
+  height: 30px;
+  border: 1px solid darkgray;
+  background-color: gray;
+}
+
+
+/* Darker background on mouse-over */
+.btn:hover {
+  background-color: RoyalBlue;
+}
+
+.btn-group button {
+  background-color: lightgray; /* Blue background */
+  border: none; /* Remove borders */
+  color: black; /* White text */
+  font-size: 12px; /* Set a font size */
+  cursor: pointer; /* Mouse pointer on hover */
+  float: left;
+  padding: 10px 0px;
+  height: 100%;
+  width:20%;
+
+}
+
+.fa-circle {
+  color:gold;
+}
+
+
+#darkButton {
+  color:rgb(250, 250, 250);
+  background-color: #2b2d2f;
+}
+
+#lightButton {
+  color:#2b2d2f;
+  background-color: rgb(250, 250, 250);
+}
