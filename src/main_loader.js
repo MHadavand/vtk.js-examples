@@ -161,8 +161,21 @@ cameraButtonGroup.appendChild(resetCameraButton);
 
 const xNormalButton = document.createElement('button');
 xNormalButton.setAttribute('class', "btn btn-primary");
-xNormalButton.innerHTML = '<i class="fa fa-refresh"></i>';
+xNormalButton.setAttribute('id', 'xButton')
+xNormalButton.innerHTML = ' X ';
 cameraButtonGroup.appendChild(xNormalButton);
+
+const yNormalButton = document.createElement('button');
+yNormalButton.setAttribute('class', "btn btn-primary");
+yNormalButton.setAttribute('id', 'yButton')
+yNormalButton.innerHTML = ' Y ';
+cameraButtonGroup.appendChild(yNormalButton);
+
+const zNormalButton = document.createElement('button');
+zNormalButton.setAttribute('class', "btn btn-primary");
+zNormalButton.setAttribute('id', 'zButton')
+zNormalButton.innerHTML = ' Z ';
+cameraButtonGroup.appendChild(zNormalButton);
 
 const darkBackGroundButton = document.createElement('button');
 darkBackGroundButton.setAttribute('class', "btn btn-primary");
