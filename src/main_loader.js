@@ -67,8 +67,21 @@ if (userParams.scale) {
 // lut
 const lutName = userParams.lut || 'Viridis (matplotlib)';
 
+// Nan color
+const nanColor = userParams.nanColor;
+
 // field
 const field = userParams.field || '';
+
+// helper function
+function getRandomColor() {
+  var letters = '0123456789ABCDEF';
+  var color = '#';
+  for (var i = 0; i < 6; i++) {
+    color += letters[Math.floor(Math.random() * 16)];
+  }
+  return color;
+}
 
 //
 // -------------------------------------------------------------------------
@@ -260,7 +273,7 @@ function createViewer(container) {
 
   xNormalButton.addEventListener('click', () => {
 
-    console.log(renderer.getActiveCamera().getViewPlaneNormal(), renderer.getActiveCamera().getViewMatrix(), renderer.getActiveCamera().getFocalPoint(), renderer.getActiveCamera(), renderer);
+    // console.log(renderer.getActiveCamera().getViewPlaneNormal(), renderer.getActiveCamera().getViewMatrix(), renderer.getActiveCamera().getFocalPoint(), renderer.getActiveCamera(), renderer);
 
     renderer.getActiveCamera().applyTransform([1, 0, 0, -862.28076171875, 0, 1, 0, -12267.353515625, 0, 0, 1, -2441.853515625, 0, 0, 0, 1]);
 
@@ -368,6 +381,12 @@ function createPipeline(fileName, fileContents) {
   colorMapCanvas.height = 15;
   colorMapCanvas.width = 200;
 
+  var solidColorSelector = document.createElement('input')
+  solidColorSelector.setAttribute('type', 'color')
+  solidColorSelector.setAttribute('id', 'solidColorPicker')
+  solidColorSelector.setAttribute('value', getRandomColor());
+
+
   // Add elements to controller and controller to container
   const controlContainer = document.createElement('div');
   controlContainer.setAttribute('class', style.control);
@@ -381,6 +400,7 @@ function createPipeline(fileName, fileContents) {
   controlContainer.appendChild(labelOutlineSelector);
   controlContainer.appendChild(colorMapCanvas);
   controlContainer.appendChild(pointSizeSelector);
+  controlContainer.appendChild(solidColorSelector);
   rootControllerContainer.appendChild(controlContainer);
 
 
@@ -408,6 +428,9 @@ function createPipeline(fileName, fileContents) {
 
   // Look up table for color maps
   const lookupTable = vtkColorTransferFunction.newInstance();
+  // Hint for categorical color map construction
+  // lookupTable.addRGBPoint(15, 1.0, 0.0, 0.0);
+  // lookupTable.addRGBPoint(5.0, 0.0, 0.0, 0.0);
 
   // Main actor and mapper for visualization component
   let actor;
@@ -444,6 +467,7 @@ function createPipeline(fileName, fileContents) {
   const scalars = source.getPointData().getScalars();
 
   const dataRange = [].concat(scalars ? scalars.getRange() : [0, 1]);
+  console.log(dataRange, 'initial data range');
   let activeArray = vtkDataArray;
 
 
@@ -455,7 +479,10 @@ function createPipeline(fileName, fileContents) {
   // Color map selection handling
   function applyPreset() {
     const preset = vtkColorMaps.getPresetByName(presetSelector.value);
+    preset.NanColor = nanColor || preset.NanColor || [0, 0, 0];
+    console.log(preset, 'chosen colormap', preset.NanColor);
     lookupTable.applyColorMap(preset);
+    console.log(dataRange, 'provided data range for color map')
     lookupTable.setMappingRange(...dataRange);
     lookupTable.updateRange();
     if (colorBySelector.value === ':') {
@@ -495,6 +522,7 @@ function createPipeline(fileName, fileContents) {
   function updateOpacity(event) {
     const opacity = Number(event.target.value) / 100;
     actor.getProperty().setOpacity(opacity);
+    console.log('opacity', actor.getProperty());
     renderWindow.render();
   }
 
@@ -580,6 +608,18 @@ function createPipeline(fileName, fileContents) {
 
   }
 
+  // solid color selection handling
+
+
+  function updateSolidColor() {
+    var color = solidColorSelector.value.match(/[A-Za-z0-9]{2}/g);
+    color = color.map(function (v) { return parseInt(v, 16) / 256 })
+    console.log(color);
+    actor.getProperty().setColor(color);
+
+  }
+  solidColorSelector.addEventListener('click', updateSolidColor);
+  solidColorSelector.addEventListener('change', updateSolidColor);
 
   // ColorBy handling
   const colorByOptions = [{ value: ':', label: 'Solid color' }].concat(
@@ -608,6 +648,7 @@ function createPipeline(fileName, fileContents) {
 
   function updateColorBy(event) {
     const [location, colorByArrayName] = event.target.value.split(':');
+    console.log(event.target.value, 'target value for color by')
     const interpolateScalarsBeforeMapping = location === 'PointData';
     let colorMode = ColorMode.DEFAULT;
     let scalarMode = ScalarMode.DEFAULT;
@@ -619,7 +660,7 @@ function createPipeline(fileName, fileContents) {
       activeArray = newArray;
       const newDataRange = activeArray.getRange();
       dataRange[0] = newDataRange[0];
-      dataRange[1] = newDataRange[1];
+      dataRange[1] = Math.min(newDataRange[1], 1000000);
       colorMode = ColorMode.MAP_SCALARS;
       scalarMode =
         location === 'PointData'
@@ -627,6 +668,7 @@ function createPipeline(fileName, fileContents) {
           : ScalarMode.USE_CELL_FIELD_DATA;
 
       const numberOfComponents = activeArray.getNumberOfComponents();
+      console.log(activeArray, activeArray.getNumberOfComponents());
       if (numberOfComponents > 1) {
         // always start on magnitude setting
         if (mapper.getLookupTable()) {
@@ -643,9 +685,12 @@ function createPipeline(fileName, fileContents) {
           .join('');
       } else {
         componentSelector.style.display = 'none';
+        solidColorSelector.style.display = 'none';
       }
     } else {
       componentSelector.style.display = 'none';
+      solidColorSelector.style.display = 'block';
+      updateSolidColor();
     }
     mapper.set({
       colorByArrayName,
